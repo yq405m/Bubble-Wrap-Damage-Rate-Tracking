@@ -1,0 +1,60 @@
+with sprids as (
+select distinct Sprid, ConsolidatedSKUClassName, sum(DamageCQ) DamageCQ, sum(ItemCQ) ItemCQ, sum(DamageGIE) DamageGIE, max(ItemCuDeliveryDate) LastDeliverDate
+from `wf-gcp-us-ae-ops-prod.supply_chain_cdl.tbl_incident_basequery_combined`
+where 1=1
+ and StycName = 'North America' 
+ and ShippedFromOurWarehouseName = 'Shipped From Our Fulfillment Center'
+ and ProductTypeLiveID = 1
+ and cast(ItemCuDeliveryDate as date) >= '2020-10-01'
+ and ConsolidatedSKUClassName in (
+'Tabletop - [Dinnerware] Dining Bowls - GLOBAL'
+,'Tabletop - [Dinnerware] Dinnerware Sets & Place Settings - GLOBAL'
+,'Tabletop - [Dinnerware] Plates & Saucers - GLOBAL'
+,'Tabletop - [Drinkware] Glassware & Barware - GLOBAL'
+,'Tabletop - [Drinkware] Mugs & Teacups - GLOBAL'
+,'Lighting - [Ceiling Lights] Chandeliers - GLOBAL'
+,'Lighting - [Ceiling Lights] Flush Mounts - GLOBAL'
+,'Lighting - [Ceiling Lights] Pendant Lights - GLOBAL'
+,'Lighting - All Lighting Accessories - GLOBAL'
+,'Lighting - Floor Lamps - GLOBAL'
+,'Lighting - Outdoor - Hanging Lights - GLOBAL'
+,'Lighting - Outdoor - Landscape Lighting - GLOBAL'
+,'Lighting - Outdoor - Lanterns and Lamps - GLOBAL'
+,'Lighting - Outdoor - Post Lights - GLOBAL'
+,'Lighting - Outdoor - Wall Lights - GLOBAL'
+,'Lighting - String Lights - GLOBAL'
+,'Lighting - Switches, Dimmers, and Outlets - GLOBAL'
+,'Lighting - Table Lamps - GLOBAL'
+,'Lighting - Track Lighting Kits - GLOBAL'
+,'Lighting - Vanity Lights - GLOBAL'
+,'Lighting - Wall Sconces - GLOBAL'
+,'Lighting [Commercial] Light Bulbs - GLOBAL'
+)
+group by 1,2
+)
+
+, selection as (
+select *, DamageCQ / ItemCQ DamageRate from sprids
+where  DamageCQ / ItemCQ > 0.03 and ItemCQ > 30 and LastDeliverDate > '2021-06-01'
+order by DamageGIE  desc
+)
+
+
+SELECT Sprid
+     , date_trunc(ItemCuDeliveryDate, week) Week
+     , ConsolidatedSKUClassName
+     , CASE WHEN cast(ItemCuDeliveryDate as date) <= '2021-11-14' Then 'Before'
+       WHEN cast(ItemCuDeliveryDate as date) > '2021-11-14' Then 'After'
+       END AS Timeline
+     , SUM(DamageCQ) Damage_CQ 	
+     , SUM(ItemCQ) Item_CQ
+     , SUM(DamageGIE) Damage_GIE
+     , SUM(DamageCQ)/SUM(ItemCQ) AS Damage_Rate  
+FROM `wf-gcp-us-ae-ops-prod.supply_chain_cdl.tbl_incident_basequery_combined`
+WHERE  StycName = 'North America' 
+AND ShippedFromOurWarehouseName = 'Shipped From Our Fulfillment Center'
+AND cast(ItemCuDeliveryDate as date) >= '2020-10-01'
+AND cast(ItemCuDeliveryDate as date) <= current_date()
+AND Sprid in (select distinct Sprid from selection)
+GROUP BY 1,2,3,4
+ORDER BY 2

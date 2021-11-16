@@ -32,7 +32,6 @@ where 1=1
 )
 group by 1,2
 )
-
 , selection as (
 select *, DamageCQ / ItemCQ DamageRate from sprids
 where  DamageCQ / ItemCQ > 0.03 and ItemCQ > 30 and LastDeliverDate > '2021-06-01'
@@ -41,10 +40,11 @@ order by DamageGIE  desc
 
 
 SELECT Sprid
+     , SuWhName 
      , date_trunc(ItemCuDeliveryDate, week) Week
      , ConsolidatedSKUClassName
-     , CASE WHEN cast(ItemCuDeliveryDate as date) <= '2021-11-14' Then 'Before'
-       WHEN cast(ItemCuDeliveryDate as date) > '2021-11-14' Then 'After'
+     , CASE WHEN date_trunc(ItemCuDeliveryDate, week) <= '2021-11-14' Then 'Before'
+       WHEN date_trunc(ItemCuDeliveryDate, week) > '2021-11-14' Then 'After'
        END AS Timeline
      , SUM(DamageCQ) Damage_CQ 	
      , SUM(ItemCQ) Item_CQ
@@ -53,8 +53,8 @@ SELECT Sprid
 FROM `wf-gcp-us-ae-ops-prod.supply_chain_cdl.tbl_incident_basequery_combined`
 WHERE  StycName = 'North America' 
 AND ShippedFromOurWarehouseName = 'Shipped From Our Fulfillment Center'
-AND cast(ItemCuDeliveryDate as date) >= '2020-10-01'
+AND cast(ItemCuDeliveryDate as date) >= '2020-10-03'
 AND cast(ItemCuDeliveryDate as date) <= current_date()
 AND Sprid in (select distinct Sprid from selection)
-GROUP BY 1,2,3,4
-ORDER BY 2
+GROUP BY 1,2,3,4,5
+ORDER BY 3,2

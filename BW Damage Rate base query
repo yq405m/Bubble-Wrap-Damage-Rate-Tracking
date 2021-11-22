@@ -38,23 +38,54 @@ where  DamageCQ / ItemCQ > 0.03 and ItemCQ > 30 and LastDeliverDate > '2021-06-0
 order by DamageGIE  desc
 )
 
-
+, T1 AS (
 SELECT Sprid
-     , SuWhName 
+     , SKUName
+     ,  case 
+        when SuWhName = 'Cranbury' then '13-Cranbury 1'
+        when SuWhName = 'Cranbury 2' then '31-Cranbury 2'
+        when SuWhName = 'Cranbury LargeParce' then '23-Cranbury LP'
+        when SuWhName = 'Hebron' then '05-Hebron'
+        when SuWhName = 'Erlanger' then '10-Erlanger'
+        when SuWhName = 'Lancaster' then '24-Lancaster'
+        when SuWhName = 'McDonough' then '17-McDonough'
+        when SuWhName = 'Port Wentworth' then '25-Port Wentworth'
+        when SuWhName = 'Jacksonville' then '28-Jacksonville'
+        when SuWhName = 'PerrisSmallParcel' then '18-Perris SP'
+        when SuWhName = 'PerrisCA' then '09-Perris LP'
+        when SuWhName = 'Lathrop' then '26-Lathrop'
+        when SuWhName = 'Mississauga' then '21-Mississauga'
+        when SuWhName = 'Florence' then '22-Florence'
+        else null end FC 
      , date_trunc(ItemCuDeliveryDate, week) Week
      , ConsolidatedSKUClassName
-     , CASE WHEN date_trunc(ItemCuDeliveryDate, week) <= '2021-11-14' Then 'Before'
-       WHEN date_trunc(ItemCuDeliveryDate, week) > '2021-11-14' Then 'After'
-       END AS Timeline
+     , ConsolidatedSKUMarketingCategoryName
+     , CASE WHEN date_trunc(ItemCuDeliveryDate, week) < '2021-11-14' Then 'Before'
+       WHEN date_trunc(ItemCuDeliveryDate, week) >= '2021-11-14' Then 'After'
+       END AS Period
      , SUM(DamageCQ) Damage_CQ 	
      , SUM(ItemCQ) Item_CQ
      , SUM(DamageGIE) Damage_GIE
      , SUM(DamageCQ)/SUM(ItemCQ) AS Damage_Rate  
-FROM `wf-gcp-us-ae-ops-prod.supply_chain_cdl.tbl_incident_basequery_combined`
+FROM `wf-gcp-us-ae-ops-prod.supply_chain_cdl.tbl_incident_basequery_combined_no_cap_no_lag`
 WHERE  StycName = 'North America' 
 AND ShippedFromOurWarehouseName = 'Shipped From Our Fulfillment Center'
-AND cast(ItemCuDeliveryDate as date) >= '2020-10-03'
-AND cast(ItemCuDeliveryDate as date) <= current_date()
+AND date_trunc(ItemCuDeliveryDate, week) >= date_add(date_trunc('2021-11-14', week), interval -3 month) 
+AND date_trunc(ItemCuDeliveryDate, week) <= current_date()
 AND Sprid in (select distinct Sprid from selection)
-GROUP BY 1,2,3,4,5
-ORDER BY 3,2
+GROUP BY 1,2,3,4,5,6,7
+)
+
+, T1_Agg AS (
+SELECT Period
+     , SUM(Damage_CQ)/SUM(Item_CQ) AS DR_Agg  
+FROM T1
+GROUP BY 1
+)
+
+SELECT a.*
+     , b.DR_Agg AS Before_Avg
+     , c.DR_Agg AS After_Avg
+FROM T1 a 
+LEFT JOIN T1_Agg b ON a.Period = b.Period AND b.Period = 'Before'
+LEFT JOIN T1_Agg c ON a.Period = c.Period AND c.Period = 'After'
